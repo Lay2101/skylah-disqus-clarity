@@ -90,10 +90,12 @@ export function DisqusComments() {
       </h3>
 
       {/* Disqus comment thread container */}
+      {/* Disqus inspects getComputedStyle text & background colors to set its theme, but crashes on Tailwind v4's oklch() color format. Plain hex colors prevent parseColor errors. */}
       <div
         id="disqus_thread"
         ref={containerRef}
         className="w-full min-h-[360px]"
+        style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
       />
 
       <noscript>
