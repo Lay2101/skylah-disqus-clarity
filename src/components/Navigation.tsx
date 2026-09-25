@@ -1,7 +1,7 @@
 import React from "react";
-import { SunMedium, Clock, MapPinned } from "lucide-react";
+import { SunMedium, MapPinned, MessageSquare } from "lucide-react";
 
-export type ScreenId = "today" | "locations";
+export type ScreenId = "today" | "locations" | "feedback";
 
 interface NavigationProps {
   activeScreen: ScreenId;
@@ -24,6 +24,12 @@ export const Navigation: React.FC<NavigationProps> = ({
       label: "All Areas",
       subtext: "Compare Areas",
       icon: MapPinned,
+    },
+    {
+      id: "feedback" as ScreenId,
+      label: "Feedback",
+      subtext: "Disqus Forum",
+      icon: MessageSquare,
     },
   ];
 

@@ -4,6 +4,7 @@ import { SourceAttributionBanner } from "./components/SourceAttributionBanner";
 import { Navigation, ScreenId } from "./components/Navigation";
 import { TodayScreen, ForecastState } from "./components/TodayScreen";
 import { LocationsScreen } from "./components/LocationsScreen";
+import { DisqusComments } from "./components/DisqusComments";
 import { FooterAttribution } from "./components/FooterAttribution";
 
 export interface WeatherArea {
@@ -189,6 +190,12 @@ export default function App() {
             statusSentence={statusSentence}
             onRetry={fetchWeather}
           />
+        )}
+
+        {activeScreen === "feedback" && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 mb-6">
+            <DisqusComments />
+          </div>
         )}
 
         {/* Singapore data.gov.sg attribution footer */}
