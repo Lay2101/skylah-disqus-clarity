@@ -10,6 +10,7 @@ import {
 import { formatSingaporeTime, isForecastExpired } from "../data/weatherData";
 import { WeatherIcon } from "./WeatherIcon";
 import { TipCard } from "./TipCard";
+import { DisqusComments } from "./DisqusComments";
 import { AudienceType } from "../data/weatherSuggestions";
 
 export type ForecastState =
@@ -411,6 +412,9 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         onSelectAudience={(aud) => setSelectedAudience(aud)}
         isValidAndFresh={isValidAndFresh}
       />
+
+      {/* Disqus community comments thread */}
+      <DisqusComments />
     </div>
   );
 };
