@@ -11,7 +11,7 @@ declare global {
 
 export function DisqusComments() {
   useEffect(() => {
-    const canonicalUrl = 'https://skylah-disqus-clarity-nu.vercel.app/';
+    const canonicalUrl = 'https://skylah.vercel.app/';
     const identifier = 'home';
 
     window.disqus_config = function (this: any) {
@@ -39,17 +39,16 @@ export function DisqusComments() {
       script.id = scriptId;
       script.src = 'https://thisislay.disqus.com/embed.js';
       script.setAttribute('data-timestamp', String(Date.now()));
-      script.crossOrigin = 'anonymous';
       script.async = true;
       (document.head || document.body).appendChild(script);
     }
   }, []);
 
   return (
-    <section className="mt-8 pt-6 border-t border-slate-200">
+    <section className="w-full max-w-4xl mx-auto px-4 py-8">
       {/* Invitation line */}
-      <p className="text-sm text-slate-600 text-center font-medium mb-4">
-        Tell us what worked for you and what did not.
+      <p className="text-gray-700 dark:text-gray-300 text-base font-medium mb-6">
+        Please let us know what worked for you and what did not.
       </p>
 
       {/* Disqus comment thread container */}
