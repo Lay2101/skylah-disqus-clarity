@@ -9,6 +9,7 @@ declare global {
   }
 }
 
+const DISQUS_SHORTNAME = "skylah-weather";
 const PAGE_URL = "https://skylah-disqus-clarity-nu.vercel.app/";
 const PAGE_IDENTIFIER = "home";
 
@@ -20,13 +21,19 @@ export const DisqusComments: React.FC = () => {
       this.page.identifier = PAGE_IDENTIFIER;
     };
 
-    const existingScript = document.getElementById("disqus-embed-script");
+    const scriptId = "disqus-embed-script";
+    const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
+    const targetSrc = `https://${DISQUS_SHORTNAME}.disqus.com/embed.js`;
 
-    if (!existingScript) {
+    if (existingScript && existingScript.src !== targetSrc) {
+      existingScript.remove();
+    }
+
+    if (!document.getElementById(scriptId)) {
       // Inject Disqus Universal Code script once
       const script = document.createElement("script");
-      script.id = "disqus-embed-script";
-      script.src = "https://thisislay.disqus.com/embed.js";
+      script.id = scriptId;
+      script.src = targetSrc;
       script.setAttribute("data-timestamp", String(+new Date()));
       script.async = true;
       (document.head || document.body).appendChild(script);
