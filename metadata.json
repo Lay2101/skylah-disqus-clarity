@@ -1,0 +1,7 @@
+{
+  "name": "SkyLah",
+  "description": "Singapore weather forecast app displaying official 2-hour forecasts from data.gov.sg across neighbourhoods.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
