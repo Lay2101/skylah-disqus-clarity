@@ -39,6 +39,7 @@ export function DisqusComments() {
       script.id = scriptId;
       script.src = 'https://thisislay.disqus.com/embed.js';
       script.setAttribute('data-timestamp', String(Date.now()));
+      script.crossOrigin = 'anonymous';
       script.async = true;
       (document.head || document.body).appendChild(script);
     }
