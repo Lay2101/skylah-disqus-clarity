@@ -92,7 +92,7 @@ export const TipCard: React.FC<TipCardProps> = ({
               We’re waiting for an up-to-date forecast before suggesting a plan.
             </p>
             <p className="text-xs text-amber-800/80 mt-1">
-              Suggestions appear automatically once a current forecast is confirmed.
+              A suggestion appears here once a current forecast is loaded. If the forecast above is out of date, tap “Get latest forecast”.
             </p>
           </div>
         </div>

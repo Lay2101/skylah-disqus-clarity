@@ -6,6 +6,7 @@ import { TodayScreen, ForecastState } from "./components/TodayScreen";
 import { LocationsScreen } from "./components/LocationsScreen";
 import { DisqusComments } from "./components/DisqusComments";
 import { FooterAttribution } from "./components/FooterAttribution";
+import { isForecastExpired } from "./data/weatherData";
 
 export interface WeatherArea {
   name: string;
@@ -84,14 +85,43 @@ export default function App() {
   } | null>(null);
   const [retrievedAt, setRetrievedAt] = useState<string | null>(null);
 
-  // Fetch all areas on mount from our serverless function (/api/weather)
-  const fetchWeather = useCallback(async () => {
-    setForecastState("loading");
-    setStatusSentence("Getting the latest two-hour forecast…");
+  // Quiet refresh state: the old forecast stays readable while a newer one is fetched
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
+  const hasForecastRef = useRef<boolean>(false);
+  hasForecastRef.current = forecastState === "success" && areas.length > 0;
+  const validEndRef = useRef<string | null>(null);
+  validEndRef.current = validPeriod?.end || sourceTimestamps?.updateTimestamp || null;
+  const refreshingRef = useRef<boolean>(false);
+
+  // Fetch all areas from our serverless function (/api/weather).
+  // quiet = true keeps the current forecast on screen instead of showing the loading state.
+  const loadForecast = useCallback(async (quiet: boolean) => {
+    const keepOnScreen = quiet && hasForecastRef.current;
+
+    // A failure during a quiet refresh keeps the current forecast and explains what happened
+    const fail = (state: ForecastState, message: string) => {
+      if (keepOnScreen) {
+        setRefreshNote(`Couldn’t get a newer forecast: ${message}`);
+      } else {
+        setForecastState(state);
+        setStatusSentence(message);
+      }
+    };
+
+    if (keepOnScreen) {
+      refreshingRef.current = true;
+      setIsRefreshing(true);
+      setRefreshNote(null);
+    } else {
+      setForecastState("loading");
+      setStatusSentence("Getting the latest two-hour forecast…");
+    }
 
     try {
       const response = await fetch("/api/weather", {
         headers: { Accept: "application/json" },
+        cache: "no-store",
       });
 
       const contentType = response.headers.get("content-type") || "";
@@ -99,11 +129,9 @@ export default function App() {
       // Check for non-JSON responses (e.g. server returning HTML 404 or SPA rewrite)
       if (!contentType.includes("application/json")) {
         if (response.status === 404) {
-          setForecastState("not_found");
-          setStatusSentence("The weather service endpoint was not found (404).");
+          fail("not_found", "The weather service endpoint was not found (404).");
         } else {
-          setForecastState("invalid_response");
-          setStatusSentence("The weather service returned an unexpected response format. Please try again shortly.");
+          fail("invalid_response", "The weather service returned an unexpected response format. Please try again shortly.");
         }
         return;
       }
@@ -113,30 +141,29 @@ export default function App() {
       // Handle serverless function or upstream error responses
       if (!response.ok || data.error) {
         if (response.status === 404 || data.errorType === "not_found") {
-          setForecastState("not_found");
-          setStatusSentence(data.message || "The weather service endpoint was not found (404).");
+          fail("not_found", data.message || "The weather service endpoint was not found (404).");
         } else if (response.status === 504 || data.errorType === "timeout") {
-          setForecastState("timeout");
-          setStatusSentence(data.message || "The weather service request timed out. Please try again shortly.");
+          fail("timeout", data.message || "The weather service request timed out. Please try again shortly.");
         } else if (response.status === 503 || data.errorType === "unreachable") {
-          setForecastState("unreachable");
-          setStatusSentence(data.message || "We couldn’t reach the weather service. Please try again shortly.");
+          fail("unreachable", data.message || "We couldn’t reach the weather service. Please try again shortly.");
         } else if (response.status === 502 || data.errorType === "invalid_response") {
-          setForecastState("invalid_response");
-          setStatusSentence(data.message || "The weather service returned an unreadable response. Please try again shortly.");
+          fail("invalid_response", data.message || "The weather service returned an unreadable response. Please try again shortly.");
         } else {
           // 401, 403, 429 or other upstream refusal
-          setForecastState("refused");
-          setStatusSentence(data.message || "The weather service declined this request. Please try again later.");
+          fail("refused", data.message || "The weather service declined this request. Please try again later.");
         }
         return;
       }
 
       // Handle empty forecast data
       if (data.empty || !Array.isArray(data.areas) || data.areas.length === 0) {
-        setForecastState("empty");
-        setStatusSentence(data.message || "No forecast is available for this area right now.");
-        setAreas([]);
+        if (keepOnScreen) {
+          setRefreshNote("data.gov.sg has no newer forecast right now. Please try again in a few minutes.");
+        } else {
+          setForecastState("empty");
+          setStatusSentence(data.message || "No forecast is available for this area right now.");
+          setAreas([]);
+        }
         return;
       }
 
@@ -147,6 +174,19 @@ export default function App() {
       setSourceTimestamps(data.sourceTimestamps || null);
       setValidPeriod(data.validPeriod || null);
       setRetrievedAt(data.retrievedAt || new Date().toISOString());
+
+      // If the newest forecast published is still past its valid time, say so plainly
+      const newEnd = data.validPeriod?.end || data.sourceTimestamps?.updateTimestamp || null;
+      if (isForecastExpired(newEnd)) {
+        const checkedAt = new Date().toLocaleTimeString("en-SG", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "Asia/Singapore",
+        });
+        setRefreshNote(`data.gov.sg hasn’t published a newer forecast yet (checked at ${checkedAt} SGT).`);
+      } else {
+        setRefreshNote(null);
+      }
 
       // Keep the area the visitor has selected (or remembered) on every fetch and Retry.
       // Fall back to City, then the first area, only if that area is not in the data.
@@ -163,14 +203,46 @@ export default function App() {
       }
     } catch (_err) {
       // Network failure / client offline / DNS unreachable
-      setForecastState("unreachable");
-      setStatusSentence("We couldn’t reach the weather service. Please try again shortly.");
+      fail("unreachable", "We couldn’t reach the weather service. Please try again shortly.");
+    } finally {
+      refreshingRef.current = false;
+      setIsRefreshing(false);
     }
   }, []);
+
+  // Full load (first visit and Retry after an error)
+  const fetchWeather = useCallback(() => {
+    loadForecast(false);
+  }, [loadForecast]);
+
+  // "Refresh" / "Get latest forecast": fetch again without hiding the current forecast
+  const refreshForecast = useCallback(() => {
+    if (refreshingRef.current) return;
+    loadForecast(true);
+  }, [loadForecast]);
 
   useEffect(() => {
     fetchWeather();
   }, [fetchWeather]);
+
+  // Re-check the clock every 30 seconds so an expired forecast is flagged at once.
+  // This only re-renders the screen; it does not fetch anything.
+  const [, setClockTick] = useState<number>(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setClockTick((t) => t + 1), 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // When the visitor comes back to the tab, fetch once only if the forecast has expired
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!hasForecastRef.current) return;
+      if (isForecastExpired(validEndRef.current)) refreshForecast();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshForecast]);
 
   // An explicit choice (dropdown, quick switch or All Areas list) is saved for next visit
   const handleSelectArea = (areaName: string) => {
@@ -214,6 +286,9 @@ export default function App() {
             validPeriod={validPeriod}
             sourceTimestamps={sourceTimestamps}
             onRetry={fetchWeather}
+            onRefresh={refreshForecast}
+            isRefreshing={isRefreshing}
+            refreshNote={refreshNote}
           />
         )}
 
