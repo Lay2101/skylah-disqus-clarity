@@ -24,6 +24,7 @@ export type ForecastState =
 
 interface TodayScreenProps {
   selectedAreaName: string;
+  isRememberedArea?: boolean;
   allAreas: Array<{ name: string; forecast: string }>;
   onSelectArea: (areaName: string) => void;
   forecastState?: ForecastState;
@@ -37,6 +38,7 @@ interface TodayScreenProps {
 
 export const TodayScreen: React.FC<TodayScreenProps> = ({
   selectedAreaName,
+  isRememberedArea = false,
   allAreas,
   onSelectArea,
   forecastState = "loading",
@@ -64,6 +66,14 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     !isLoading &&
     Boolean(realForecastText) &&
     !isStale;
+
+  // "Change" under a remembered area takes the visitor straight to the area selector
+  const focusAreaSelector = () => {
+    const card = document.getElementById("location-selector-card");
+    card?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const select = document.getElementById("neighbourhood-select") as HTMLSelectElement | null;
+    select?.focus({ preventScroll: true });
+  };
 
   // Quick areas for convenient mobile switching
   const quickAreas = ["City", "Ang Mo Kio", "Bedok", "Jurong West", "Woodlands", "Tampines"];
@@ -189,8 +199,26 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
 
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2 flex items-center gap-2">
             <MapPin className="w-6 h-6 text-sky-700 shrink-0" aria-hidden="true" />
-            <span>{selectedAreaName}</span>
+            <span>Forecast for {selectedAreaName}</span>
           </h1>
+
+          {/* Never show a remembered area silently */}
+          {isRememberedArea && (
+            <p
+              id="remembered-area-note"
+              className="text-xs sm:text-sm text-slate-600 mt-1 flex items-center gap-1.5"
+            >
+              <span>Your last chosen area</span>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                onClick={focusAreaSelector}
+                className="font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900 cursor-pointer"
+              >
+                Change
+              </button>
+            </p>
+          )}
 
           {/* Validity Period in Singapore Time */}
           {validPeriod && (

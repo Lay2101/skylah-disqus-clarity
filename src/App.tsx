@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { SourceAttributionBanner } from "./components/SourceAttributionBanner";
 import { Navigation, ScreenId } from "./components/Navigation";
@@ -30,8 +30,39 @@ export interface WeatherDataResponse {
   message?: string;
 }
 
+// Key used to remember the visitor's chosen forecast area in this browser
+const AREA_STORAGE_KEY = "skylah_area";
+
+function readSavedArea(): string | null {
+  try {
+    const saved = window.localStorage.getItem(AREA_STORAGE_KEY);
+    return saved && saved.trim() ? saved : null;
+  } catch (_err) {
+    // Storage blocked (private mode, disabled cookies): the app still works without it
+    return null;
+  }
+}
+
+function saveArea(areaName: string) {
+  try {
+    window.localStorage.setItem(AREA_STORAGE_KEY, areaName);
+  } catch (_err) {
+    // Storage blocked: nothing to do, the choice still applies for this visit
+  }
+}
+
 export default function App() {
-  const [selectedAreaName, setSelectedAreaName] = useState<string>("City");
+  // Start from the area chosen on a previous visit, if there is one; otherwise City
+  const [initialSavedArea] = useState<string | null>(() => readSavedArea());
+  const [selectedAreaName, setSelectedAreaName] = useState<string>(
+    initialSavedArea || "City"
+  );
+  // True while the area shown came from a previous visit rather than a choice made now
+  const [isRememberedArea, setIsRememberedArea] = useState<boolean>(
+    Boolean(initialSavedArea)
+  );
+  const selectedAreaRef = useRef<string>(selectedAreaName);
+  selectedAreaRef.current = selectedAreaName;
   const [activeScreen, setActiveScreen] = useState<ScreenId>("today");
 
   // Distinct states: loading, empty, not_found, timeout, unreachable, refused, invalid_response, success
@@ -117,17 +148,19 @@ export default function App() {
       setValidPeriod(data.validPeriod || null);
       setRetrievedAt(data.retrievedAt || new Date().toISOString());
 
-      // Default to "City" if available, else retain current or fall back to first area
-      setSelectedAreaName((current) => {
-        const hasCity = data.areas.some(
-          (a) => a.name.toLowerCase() === "city"
-        );
-        if (hasCity) return "City";
-        const exists = data.areas.some(
-          (a) => a.name.toLowerCase() === current.toLowerCase()
-        );
-        return exists ? current : data.areas[0].name;
-      });
+      // Keep the area the visitor has selected (or remembered) on every fetch and Retry.
+      // Fall back to City, then the first area, only if that area is not in the data.
+      const currentArea = selectedAreaRef.current;
+      const match = data.areas.find(
+        (a) => a.name.toLowerCase() === currentArea.toLowerCase()
+      );
+      if (match) {
+        setSelectedAreaName(match.name);
+      } else {
+        const city = data.areas.find((a) => a.name.toLowerCase() === "city");
+        setSelectedAreaName(city ? city.name : data.areas[0].name);
+        setIsRememberedArea(false);
+      }
     } catch (_err) {
       // Network failure / client offline / DNS unreachable
       setForecastState("unreachable");
@@ -139,12 +172,15 @@ export default function App() {
     fetchWeather();
   }, [fetchWeather]);
 
+  // An explicit choice (dropdown, quick switch or All Areas list) is saved for next visit
   const handleSelectArea = (areaName: string) => {
     setSelectedAreaName(areaName);
+    setIsRememberedArea(false);
+    saveArea(areaName);
   };
 
   const handleSelectAreaAndOpenToday = (areaName: string) => {
-    setSelectedAreaName(areaName);
+    handleSelectArea(areaName);
     setActiveScreen("today");
   };
 
@@ -164,6 +200,7 @@ export default function App() {
         {activeScreen === "today" && (
           <TodayScreen
             selectedAreaName={selectedAreaName}
+            isRememberedArea={isRememberedArea}
             allAreas={areas}
             onSelectArea={handleSelectArea}
             forecastState={forecastState}
